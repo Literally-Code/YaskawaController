@@ -9,6 +9,8 @@ library will be more effective than socket programming with Python.
 */
 
 #include <iostream>
+#include <string>
+#include <cstdlib>
 #include "YMConnect.h"
 
 constexpr int ARG_REQ = 2;
@@ -19,35 +21,63 @@ const char* RequiredArguments[ARG_REQ] =
     "Singal to send (stop/start)"
 };
 
-int main(int argc, char** argv)
+int check_args(int argc, char** argv)
 {
-    // Validate arguments
-    for (int i = argc-1; i < ARG_REQ; i++)
+    for (int i = argc - 1; i < ARG_REQ; i++)
     {
         std::cerr << "Missing argument: " << RequiredArguments[i] << std::endl;
     }
 
     if (argc - 1 < ARG_REQ)
     {
-        
         return 1;
     }
+}
 
-    // Struct for storing status of the connection
-    StatusInfo status{};
+int main(int argc, char** argv)
+{
+    // Validate arguments
+    int args_status = check_args(argc, argv);
+    if (args_status != 0)
+    {
+        return args_status;
+    }
 
-    // Establish connection
-    MotomanController* controller = YMConnect::OpenConnection(argv[1], status);
-
-    std::cout << status << std::endl;
-    std::cin.get();
+    char waitForUserToPressEnter;
+    std::string signal = argv[2];
+    StatusInfo status;
+    MotomanController* c = YMConnect::OpenConnection(argv[1], status);
 
     if (status.StatusCode != 0)
     {
+        std::cout << status << std::endl;
+        std::cin >> waitForUserToPressEnter;
         return status.StatusCode;
     }
 
-    YMConnect::CloseConnection(controller);
+    status = c->ControlCommands->DisplayStringToPendant("Hello from YMConnect");
+    
+    /*
+        // Probably not ideal, stops the motion itself without stopping the job
+        c->MotionManager->MotionStop()
+        c->MotionManager->MotionStart()
+    
+        // Likely makes the process actually hold
+    */
 
-    return 0;
+    std::cout << status << std::endl;
+
+    if (signal == "stop")
+    {
+        c->ControlCommands->SetHold(SignalStatus::ON);
+        std::cout << "Sent signal to stop" << std::endl;
+        std::cout << status << std::endl;
+    }
+
+    YMConnect::CloseConnection(c);
+
+    std::cin >> waitForUserToPressEnter;
+    system("pause"); // Delet this
+
+    return status.StatusCode;
 }
